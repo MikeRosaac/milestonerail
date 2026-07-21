@@ -1,0 +1,20 @@
+{
+  "id": "milestonerail-sla-scan-v1",
+  "resource": "jobs/sla-scan",
+  "actionables": [
+    {
+      "id": 1,
+      "mode": "QUERY",
+      "run_in_background": true,
+      "retries": 2,
+      "sql_query": {
+        "query": "WITH overdue AS (SELECT s.id AS submission_id, s.organization_id, s.status, s.updated_at, ws.sla_hours, concat('sla:', s.id, ':', s.status, ':', extract(epoch FROM s.updated_at)::bigint) AS dedupe_key FROM submissions s JOIN organizations o ON o.id = s.organization_id AND o.active = TRUE JOIN milestones m ON m.id = s.milestone_id AND m.organization_id = s.organization_id JOIN workflow_steps ws ON ws.id = s.current_step_id AND ws.organization_id = s.organization_id AND ws.cohort_id = m.cohort_id WHERE s.status IN ('submitted', 'awaiting_finance', 'processing') AND ws.active = TRUE AND ws.sla_hours IS NOT NULL AND s.updated_at + (ws.sla_hours::text || ' hours')::interval < CURRENT_TIMESTAMP), inserted AS (INSERT INTO audit_events (organization_id, submission_id, actor_id, actor_name, actor_role, event_type, event_key, title, detail, metadata, created_at) SELECT o.organization_id, o.submission_id, NULL, 'MilestoneRail', 'system', 'sla_flagged', o.dedupe_key, 'SLA attention required', concat('The ', o.status, ' step exceeded its ', o.sla_hours::text, '-hour SLA.'), jsonb_build_object('status', o.status, 'dedupeKey', o.dedupe_key), CURRENT_TIMESTAMP FROM overdue o WHERE NOT EXISTS (SELECT 1 FROM audit_events a WHERE a.organization_id = o.organization_id AND a.submission_id = o.submission_id AND a.event_type = 'sla_flagged' AND a.event_key = o.dedupe_key) RETURNING id, organization_id, submission_id, event_type, created_at) SELECT id, organization_id AS \"organizationId\", submission_id AS \"submissionId\", event_type AS \"eventType\", created_at::text AS \"createdAt\" FROM inserted",
+        "parameters": []
+      },
+      "cron_job": {
+        "execution_interval": "0 */15 * * * *"
+      },
+      "returnables": ["id", "organizationId", "submissionId", "eventType", "createdAt"]
+    }
+  ]
+}

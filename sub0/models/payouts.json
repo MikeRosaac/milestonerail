@@ -1,0 +1,78 @@
+{
+  "id": {
+    "type": "Number",
+    "primary_key": true,
+    "auto_increment": true
+  },
+  "organization_id": {
+    "type": "Number",
+    "foreign_key": {
+      "of": "organizations",
+      "key": "id"
+    },
+    "indexable": true
+  },
+  "submission_id": {
+    "type": "Number",
+    "foreign_key": {
+      "of": "submissions",
+      "key": "id"
+    },
+    "indexable": true
+  },
+  "learner_id": {
+    "type": "Number",
+    "foreign_key": {
+      "of": "users",
+      "key": "id"
+    },
+    "indexable": true
+  },
+  "amount": {
+    "type": "Float"
+  },
+  "currency": {
+    "type": "String",
+    "max_length": 3
+  },
+  "provider": {
+    "type": "String",
+    "max_length": 40
+  },
+  "provider_reference": {
+    "type": "String",
+    "max_length": 160,
+    "indexable": true
+  },
+  "provider_event_id": {
+    "type": "String",
+    "max_length": 160,
+    "optional": true,
+    "indexable": true
+  },
+  "status": {
+    "type": "String",
+    "max_length": 32,
+    "indexable": true
+  },
+  "failure_message": {
+    "type": "String",
+    "max_length": 1000,
+    "optional": true
+  },
+  "approved_at": {
+    "type": "DateTime",
+    "optional": true
+  },
+  "paid_at": {
+    "type": "DateTime",
+    "optional": true
+  },
+  "created_at": {
+    "type": "DateTime"
+  },
+  "updated_at": {
+    "type": "DateTime",
+    "indexable": true
+  }
+}

@@ -1,0 +1,71 @@
+{
+  "id": "milestonerail-paystack-webhook-v1",
+  "resource": "webhooks/paystack",
+  "run_in_background": true,
+  "webhook": {
+    "verifications": {
+      "HmacSignatureVerifier": {
+        "sig_header": "$HEADER.X-Paystack-Signature",
+        "secret_key": "$ENV.PAYSTACK_SECRET_KEY",
+        "algorithm": "sha512"
+      }
+    }
+  },
+  "actionables": [
+    {
+      "id": 2,
+      "mode": "QUERY",
+      "run_in_background": true,
+      "depends_on": [
+        {
+          "resource_id": "self",
+          "action_ids": [1],
+          "extract_response_for": [
+            {
+              "extract": "learnerId",
+              "for": "uid"
+            },
+            {
+              "extract": "organizationId",
+              "for": "notification_organization_id"
+            }
+          ]
+        }
+      ],
+      "sql_query": {
+        "query": "SELECT TRUE AS updated FROM users u JOIN organizations o ON o.id = u.organization_id AND o.active = TRUE WHERE u.id = $1 AND u.organization_id = $2 AND u.active = TRUE",
+        "parameters": ["uid", "notification_organization_id"]
+      },
+      "returnables": ["updated"],
+      "broadcast_websocket_message": {
+        "broadcast_type": "SINGLE",
+        "action": "payout.updated",
+        "broadcast_to": "$PAYLOAD.uid"
+      }
+    },
+    {
+      "id": 1,
+      "mode": "QUERY",
+      "no_op": true,
+      "retries": 3,
+      "sql_query": {
+        "query": "WITH incoming AS (SELECT $1::text AS event_name, $2::text AS provider_reference, $3::text AS provider_event_id, left(COALESCE($4::text, ''), 1000) AS provider_message), updated_payout AS (UPDATE payouts p SET status = CASE WHEN i.event_name = 'transfer.success' THEN 'paid' ELSE 'failed' END, provider_event_id = NULLIF(i.provider_event_id, ''), failure_message = CASE WHEN i.event_name = 'transfer.success' THEN NULL ELSE NULLIF(i.provider_message, '') END, paid_at = CASE WHEN i.event_name = 'transfer.success' THEN CURRENT_TIMESTAMP ELSE NULL END, updated_at = CURRENT_TIMESTAMP FROM incoming i WHERE p.provider_reference = i.provider_reference AND p.provider = 'paystack-test' AND p.status IN ('queued', 'processing') AND i.event_name IN ('transfer.success', 'transfer.failed', 'transfer.reversed') AND length(i.provider_reference) BETWEEN 8 AND 160 RETURNING p.*), updated_submission AS (UPDATE submissions s SET status = p.status, current_step_id = CASE WHEN p.status = 'paid' THEN COALESCE((SELECT ws.id FROM milestones m JOIN workflow_steps ws ON ws.cohort_id = m.cohort_id AND ws.organization_id = m.organization_id WHERE m.id = s.milestone_id AND m.organization_id = s.organization_id AND ws.active = TRUE AND ws.step_type = 'receipt' AND ws.role = 'system' ORDER BY ws.position LIMIT 1), s.current_step_id) ELSE s.current_step_id END, updated_at = CURRENT_TIMESTAMP FROM updated_payout p WHERE s.id = p.submission_id AND s.organization_id = p.organization_id AND s.status IN ('processing', 'awaiting_finance') RETURNING s.id, s.organization_id), audited AS (INSERT INTO audit_events (organization_id, submission_id, actor_id, actor_name, actor_role, event_type, event_key, title, detail, metadata, created_at) SELECT p.organization_id, p.submission_id, NULL, 'Paystack test', 'provider', CASE WHEN p.status = 'paid' THEN 'payout_paid' ELSE 'payout_failed' END, concat('paystack:', COALESCE(p.provider_event_id, 'none'), ':', p.provider_reference), CASE WHEN p.status = 'paid' THEN 'Test payout confirmed' ELSE 'Test payout failed' END, CASE WHEN p.status = 'paid' THEN concat('Signed webhook confirmed ', p.currency, ' ', p.amount::text, ' as paid.') ELSE COALESCE(p.failure_message, 'Paystack reported that the test transfer failed.') END, jsonb_build_object('providerReference', p.provider_reference, 'providerEventId', COALESCE(p.provider_event_id, ''), 'status', p.status), CURRENT_TIMESTAMP FROM updated_payout p JOIN updated_submission s ON s.id = p.submission_id AND s.organization_id = p.organization_id RETURNING id) SELECT p.id, p.organization_id AS \"organizationId\", p.submission_id AS \"submissionId\", p.learner_id AS \"learnerId\", p.provider_reference AS \"providerReference\", p.status, p.paid_at::text AS \"paidAt\" FROM updated_payout p JOIN updated_submission s ON s.id = p.submission_id AND s.organization_id = p.organization_id JOIN audited a ON TRUE",
+        "parameters": [
+          "$PAYLOAD.event",
+          "$PAYLOAD.data.reference",
+          "$PAYLOAD.data.id",
+          "$PAYLOAD.data.reason"
+        ]
+      },
+      "returnables": [
+        "id",
+        "organizationId",
+        "submissionId",
+        "learnerId",
+        "providerReference",
+        "status",
+        "paidAt"
+      ]
+    }
+  ]
+}

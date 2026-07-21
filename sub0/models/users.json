@@ -1,0 +1,54 @@
+{
+  "id": {
+    "type": "Number",
+    "primary_key": true,
+    "auto_increment": true
+  },
+  "organization_id": {
+    "type": "Number",
+    "foreign_key": {
+      "of": "organizations",
+      "key": "id"
+    },
+    "indexable": true
+  },
+  "name": {
+    "type": "String",
+    "max_length": 160,
+    "indexable": true
+  },
+  "email": {
+    "type": "String",
+    "max_length": 255,
+    "indexable": true
+  },
+  "password": {
+    "type": "String",
+    "max_length": 255
+  },
+  "role": {
+    "type": "String",
+    "max_length": 20,
+    "indexable": true
+  },
+  "avatar_url": {
+    "type": "String",
+    "max_length": 2048,
+    "optional": true
+  },
+  "paystack_recipient_code": {
+    "type": "String",
+    "max_length": 100,
+    "optional": true
+  },
+  "active": {
+    "type": "Boolean",
+    "indexable": true
+  },
+  "created_at": {
+    "type": "DateTime"
+  },
+  "updated_at": {
+    "type": "DateTime"
+  }
+}

@@ -1,0 +1,221 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans:
+    'Inter', 'SF Pro Text', 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    sans-serif;
+  --color-brand-50: #f2f5ff;
+  --color-brand-100: #e5eaff;
+  --color-brand-500: #5969ed;
+  --color-brand-600: #4754d4;
+  --color-brand-700: #3f47ad;
+}
+
+:root {
+  font-family: var(--font-sans);
+  color: #0f172a;
+  background: #f7f8fb;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-width: 320px;
+  min-height: 100%;
+  background: #f7f8fb;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+  overflow-x: hidden;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #94a3b8;
+}
+
+::selection {
+  color: #1e1b4b;
+  background: #c7d2fe;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background: #cbd5e1;
+  background-clip: padding-box;
+}
+
+.page-grid {
+  background-image:
+    linear-gradient(rgba(148, 163, 184, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.08) 1px, transparent 1px);
+  background-size: 36px 36px;
+}
+
+.noise {
+  position: relative;
+}
+
+.noise::after {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  content: '';
+  opacity: 0.22;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.08'/%3E%3C/svg%3E");
+}
+
+.focus-ring {
+  @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2;
+}
+
+.field {
+  @apply w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-sm transition outline-none;
+}
+
+.field:hover {
+  @apply border-slate-300;
+}
+
+.field:focus {
+  @apply border-indigo-400 ring-4 ring-indigo-500/10;
+}
+
+.field:disabled {
+  @apply cursor-not-allowed bg-slate-100 text-slate-400;
+}
+
+.landing-glow {
+  position: absolute;
+  top: -18rem;
+  left: 45%;
+  width: 62rem;
+  height: 62rem;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 35% 40%, rgb(199 210 254 / 65%), transparent 42%),
+    radial-gradient(circle at 68% 62%, rgb(165 243 252 / 45%), transparent 38%);
+  filter: blur(6px);
+  transform: translateX(-10%);
+  pointer-events: none;
+}
+
+.landing-glow::after {
+  position: absolute;
+  inset: 7rem;
+  border: 1px solid rgb(99 102 241 / 9%);
+  border-radius: 999px;
+  content: '';
+  box-shadow:
+    0 0 0 70px rgb(99 102 241 / 3%),
+    0 0 0 150px rgb(99 102 241 / 2%);
+}
+
+.auth-orb {
+  position: absolute;
+  top: -16rem;
+  right: -17rem;
+  width: 42rem;
+  height: 42rem;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at center, rgb(99 102 241 / 42%), transparent 55%),
+    radial-gradient(circle at 35% 70%, rgb(34 211 238 / 18%), transparent 35%);
+  pointer-events: none;
+}
+
+.auth-orb::after {
+  position: absolute;
+  inset: 8rem;
+  border: 1px solid rgb(255 255 255 / 8%);
+  border-radius: inherit;
+  content: '';
+  box-shadow:
+    0 0 0 80px rgb(255 255 255 / 2%),
+    0 0 0 160px rgb(255 255 255 / 1%);
+}
+
+.recharts-wrapper,
+.recharts-surface {
+  outline: none;
+}
+
+.react-flow__controls {
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  box-shadow: 0 8px 24px -14px rgb(15 23 42 / 35%);
+}
+
+.react-flow__controls-button {
+  border-color: #e2e8f0;
+  color: #475569;
+}
+
+.react-flow__controls-button:hover {
+  background: #f8fafc;
+}
+
+.react-flow__node:focus-visible {
+  border-radius: 1rem;
+  outline: 2px solid #6366f1;
+  outline-offset: 3px;
+}
+
+@media (max-width: 640px) {
+  .landing-glow {
+    top: -24rem;
+    left: 0;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

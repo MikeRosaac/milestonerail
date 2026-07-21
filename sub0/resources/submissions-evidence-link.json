@@ -1,0 +1,87 @@
+{
+  "id": "milestonerail-submissions-evidence-link-v1",
+  "resource": "submissions/evidence-link",
+  "tokenize": {
+    "type": "JWT",
+    "algorithm": "HS256",
+    "encryption_key": "$ENV.JWT_SECRET_KEY"
+  },
+  "protected": {
+    "provide_as": "Authorization",
+    "extract_claims": ["id", "organizationId", "role", "name", "email"]
+  },
+  "rate_limit": {
+    "limit": 10,
+    "identifier": "$PROTECTED.id",
+    "expires_after": 60
+  },
+  "actionables": [
+    {
+      "id": 1,
+      "mode": "QUERY",
+      "payload_validation": [
+        {
+          "field": {
+            "submission_id": {
+              "type": "NUMBER"
+            }
+          }
+        },
+        {
+          "field": {
+            "evidence_url": {
+              "type": "STRING"
+            }
+          },
+          "min_length": 8,
+          "max_length": 2048
+        },
+        {
+          "field": {
+            "note": {
+              "type": "STRING"
+            }
+          },
+          "min_length": 1,
+          "max_length": 2000
+        }
+      ],
+      "sql_query": {
+        "query": "WITH caller AS (SELECT u.id, u.organization_id, u.name, u.role FROM users u JOIN organizations o ON o.id = u.organization_id AND o.active = TRUE WHERE u.id = $1 AND u.organization_id = $2 AND u.role = $3 AND u.role = 'learner' AND u.active = TRUE), candidate AS (SELECT s.id, next_step.id AS next_step_id FROM submissions s JOIN milestones m ON m.id = s.milestone_id AND m.organization_id = s.organization_id JOIN caller ca ON ca.organization_id = s.organization_id AND ca.id = s.learner_id JOIN LATERAL (SELECT ws.id FROM workflow_steps ws WHERE ws.organization_id = s.organization_id AND ws.cohort_id = m.cohort_id AND ws.active = TRUE AND ws.step_type = 'approval' AND ws.role = 'mentor' ORDER BY ws.position LIMIT 1) next_step ON TRUE WHERE s.id = $4 AND s.status IN ('draft', 'changes_requested') AND $5 ~ '^https://[^[:space:]]+$' AND length($6) BETWEEN 1 AND 2000), updated AS (UPDATE submissions s SET evidence_url = $5, evidence_storage_key = NULL, evidence_file_name = NULL, evidence_note = $6, status = 'submitted', current_step_id = c.next_step_id, submitted_at = CURRENT_TIMESTAMP, reviewer_feedback = NULL, updated_at = CURRENT_TIMESTAMP FROM candidate c WHERE s.id = c.id AND s.status IN ('draft', 'changes_requested') RETURNING s.*), audited AS (INSERT INTO audit_events (organization_id, submission_id, actor_id, actor_name, actor_role, event_type, event_key, title, detail, metadata, created_at) SELECT u.organization_id, u.id, ca.id, ca.name, ca.role, 'evidence_submitted', concat('evidence:', u.id, ':', extract(epoch FROM u.updated_at)::bigint), 'Evidence submitted', 'Evidence is ready for mentor review.', NULL, u.updated_at FROM updated u CROSS JOIN caller ca RETURNING id) SELECT u.id, u.milestone_id AS \"milestoneId\", u.learner_id AS \"learnerId\", learner.name AS \"learnerName\", m.title AS \"milestoneTitle\", c.name AS \"cohortName\", u.evidence_url AS \"evidenceUrl\", u.evidence_file_name AS \"evidenceFileName\", u.evidence_note AS \"evidenceNote\", u.status, u.current_step_id AS \"currentStepId\", u.submitted_at::text AS \"submittedAt\", u.updated_at::text AS \"updatedAt\", m.due_at::text AS \"dueAt\", u.reviewer_feedback AS \"reviewerFeedback\", m.amount, COALESCE(p.status, 'not_started') AS \"payoutStatus\" FROM updated u JOIN audited a ON TRUE JOIN users learner ON learner.id = u.learner_id AND learner.organization_id = u.organization_id JOIN milestones m ON m.id = u.milestone_id AND m.organization_id = u.organization_id JOIN cohorts c ON c.id = m.cohort_id AND c.organization_id = u.organization_id LEFT JOIN LATERAL (SELECT p1.status FROM payouts p1 WHERE p1.organization_id = u.organization_id AND p1.submission_id = u.id ORDER BY p1.created_at DESC LIMIT 1) p ON TRUE",
+        "parameters": [
+          "$PROTECTED.id",
+          "$PROTECTED.organizationId",
+          "$PROTECTED.role",
+          "$PAYLOAD.submission_id",
+          "$PAYLOAD.evidence_url",
+          "$PAYLOAD.note"
+        ]
+      },
+      "returnables": [
+        "id",
+        "milestoneId",
+        "learnerId",
+        "learnerName",
+        "milestoneTitle",
+        "cohortName",
+        "evidenceUrl",
+        "evidenceFileName",
+        "evidenceNote",
+        "status",
+        "currentStepId",
+        "submittedAt",
+        "updatedAt",
+        "dueAt",
+        "reviewerFeedback",
+        "amount",
+        "payoutStatus"
+      ],
+      "main_returnable": true,
+      "broadcast_websocket_message": {
+        "broadcast_type": "SINGLE",
+        "action": "submission.updated",
+        "broadcast_to": "$PROTECTED.id"
+      }
+    }
+  ]
+}

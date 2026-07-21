@@ -1,0 +1,58 @@
+{
+  "id": {
+    "type": "Number",
+    "primary_key": true,
+    "auto_increment": true
+  },
+  "organization_id": {
+    "type": "Number",
+    "foreign_key": {
+      "of": "organizations",
+      "key": "id"
+    },
+    "indexable": true
+  },
+  "cohort_id": {
+    "type": "Number",
+    "foreign_key": {
+      "of": "cohorts",
+      "key": "id"
+    },
+    "indexable": true
+  },
+  "label": {
+    "type": "String",
+    "max_length": 160
+  },
+  "description": {
+    "type": "String",
+    "max_length": 2000
+  },
+  "step_type": {
+    "type": "String",
+    "max_length": 20,
+    "indexable": true
+  },
+  "role": {
+    "type": "String",
+    "max_length": 20
+  },
+  "position": {
+    "type": "Number",
+    "indexable": true
+  },
+  "sla_hours": {
+    "type": "Number",
+    "optional": true
+  },
+  "active": {
+    "type": "Boolean",
+    "indexable": true
+  },
+  "created_at": {
+    "type": "DateTime"
+  },
+  "updated_at": {
+    "type": "DateTime"
+  }
+}

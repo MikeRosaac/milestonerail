@@ -1,0 +1,31 @@
+{
+  "id": {
+    "type": "Number",
+    "primary_key": true,
+    "auto_increment": true
+  },
+  "name": {
+    "type": "String",
+    "max_length": 160,
+    "indexable": true
+  },
+  "slug": {
+    "type": "String",
+    "max_length": 100,
+    "indexable": true
+  },
+  "currency": {
+    "type": "String",
+    "max_length": 3
+  },
+  "active": {
+    "type": "Boolean",
+    "indexable": true
+  },
+  "created_at": {
+    "type": "DateTime"
+  },
+  "updated_at": {
+    "type": "DateTime"
+  }
+}

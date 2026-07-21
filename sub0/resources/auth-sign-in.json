@@ -1,0 +1,55 @@
+{
+  "id": "milestonerail-auth-sign-in-v1",
+  "resource": "auth/sign-in",
+  "tokenize": {
+    "type": "JWT",
+    "algorithm": "HS256",
+    "expiration": 28800,
+    "encryption_key": "$ENV.JWT_SECRET_KEY",
+    "custom_claim_fields": ["id", "organizationId", "role", "name", "email"],
+    "property_name": "token"
+  },
+  "rate_limit": {
+    "limit": 5,
+    "identifier": "$HEADER.ip",
+    "expires_after": 300
+  },
+  "actionables": [
+    {
+      "id": 1,
+      "mode": "QUERY",
+      "payload_validation": [
+        {
+          "field": {
+            "email": {
+              "type": "EMAIL"
+            }
+          },
+          "min_length": 5,
+          "max_length": 255
+        },
+        {
+          "field": {
+            "password": {
+              "type": "STRING"
+            }
+          },
+          "min_length": 8,
+          "max_length": 72
+        }
+      ],
+      "sql_query": {
+        "query": "SELECT u.id, u.organization_id AS \"organizationId\", u.name, u.email, u.role, u.password, (CURRENT_TIMESTAMP + INTERVAL '8 hours')::text AS \"expiresAt\" FROM users u JOIN organizations o ON o.id = u.organization_id AND o.active = TRUE WHERE LOWER(u.email) = LOWER($1) AND u.active = TRUE AND u.role IN ('learner', 'mentor', 'finance', 'admin') AND (SELECT COUNT(*) FROM users u2 JOIN organizations o2 ON o2.id = u2.organization_id AND o2.active = TRUE WHERE LOWER(u2.email) = LOWER($1) AND u2.active = TRUE) = 1 LIMIT 1",
+        "parameters": ["$PAYLOAD.email"]
+      },
+      "verify_hashables": [
+        {
+          "property": "password",
+          "algorithm": "BCRYPT"
+        }
+      ],
+      "returnables": ["id", "organizationId", "name", "email", "role", "expiresAt", "token"],
+      "main_returnable": true
+    }
+  ]
+}

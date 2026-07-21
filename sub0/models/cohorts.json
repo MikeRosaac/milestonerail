@@ -1,0 +1,60 @@
+{
+  "id": {
+    "type": "Number",
+    "primary_key": true,
+    "auto_increment": true
+  },
+  "organization_id": {
+    "type": "Number",
+    "foreign_key": {
+      "of": "organizations",
+      "key": "id"
+    },
+    "indexable": true
+  },
+  "name": {
+    "type": "String",
+    "max_length": 160,
+    "indexable": true
+  },
+  "program_name": {
+    "type": "String",
+    "max_length": 160
+  },
+  "location": {
+    "type": "String",
+    "max_length": 255
+  },
+  "start_date": {
+    "type": "DateTime"
+  },
+  "end_date": {
+    "type": "DateTime"
+  },
+  "currency": {
+    "type": "String",
+    "max_length": 3
+  },
+  "budget": {
+    "type": "Float"
+  },
+  "committed": {
+    "type": "Float"
+  },
+  "disbursed": {
+    "type": "Float"
+  },
+  "learner_count": {
+    "type": "Number"
+  },
+  "active": {
+    "type": "Boolean",
+    "indexable": true
+  },
+  "created_at": {
+    "type": "DateTime"
+  },
+  "updated_at": {
+    "type": "DateTime"
+  }
+}

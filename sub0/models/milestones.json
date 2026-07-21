@@ -1,0 +1,56 @@
+{
+  "id": {
+    "type": "Number",
+    "primary_key": true,
+    "auto_increment": true
+  },
+  "organization_id": {
+    "type": "Number",
+    "foreign_key": {
+      "of": "organizations",
+      "key": "id"
+    },
+    "indexable": true
+  },
+  "cohort_id": {
+    "type": "Number",
+    "foreign_key": {
+      "of": "cohorts",
+      "key": "id"
+    },
+    "indexable": true
+  },
+  "title": {
+    "type": "String",
+    "max_length": 200,
+    "indexable": true
+  },
+  "description": {
+    "type": "String",
+    "max_length": 4000
+  },
+  "due_at": {
+    "type": "DateTime",
+    "indexable": true
+  },
+  "amount": {
+    "type": "Float"
+  },
+  "evidence_hint": {
+    "type": "String",
+    "max_length": 1000
+  },
+  "position": {
+    "type": "Number"
+  },
+  "active": {
+    "type": "Boolean",
+    "indexable": true
+  },
+  "created_at": {
+    "type": "DateTime"
+  },
+  "updated_at": {
+    "type": "DateTime"
+  }
+}

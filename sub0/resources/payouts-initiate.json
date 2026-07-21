@@ -1,0 +1,143 @@
+{
+  "id": "milestonerail-payouts-initiate-v1",
+  "resource": "payouts/initiate",
+  "tokenize": {
+    "type": "JWT",
+    "algorithm": "HS256",
+    "encryption_key": "$ENV.JWT_SECRET_KEY"
+  },
+  "protected": {
+    "provide_as": "Authorization",
+    "extract_claims": ["id", "organizationId", "role", "name", "email"]
+  },
+  "rate_limit": {
+    "limit": 10,
+    "identifier": "$PROTECTED.id",
+    "expires_after": 300
+  },
+  "returnables": [
+    "id",
+    "submissionId",
+    "learnerId",
+    "learnerName",
+    "milestoneTitle",
+    "amount",
+    "currency",
+    "provider",
+    "providerReference",
+    "status",
+    "approvedAt",
+    "paidAt"
+  ],
+  "actionables": [
+    {
+      "id": 1,
+      "mode": "QUERY",
+      "payload_validation": [
+        {
+          "field": {
+            "submission_id": {
+              "type": "NUMBER"
+            }
+          }
+        }
+      ],
+      "sql_query": {
+        "query": "WITH caller AS (SELECT u.id, u.organization_id, u.name, u.role FROM users u JOIN organizations o ON o.id = u.organization_id AND o.active = TRUE WHERE u.id = $1 AND u.organization_id = $2 AND u.role = $3 AND u.role IN ('finance', 'admin') AND u.active = TRUE), candidate AS (SELECT s.id, s.organization_id, s.learner_id, s.milestone_id, m.amount, c.currency, learner.paystack_recipient_code, payout_step.id AS payout_step_id FROM submissions s JOIN milestones m ON m.id = s.milestone_id AND m.organization_id = s.organization_id JOIN cohorts c ON c.id = m.cohort_id AND c.organization_id = s.organization_id JOIN users learner ON learner.id = s.learner_id AND learner.organization_id = s.organization_id AND learner.active = TRUE JOIN caller ca ON ca.organization_id = s.organization_id JOIN LATERAL (SELECT ws.id FROM workflow_steps ws WHERE ws.organization_id = s.organization_id AND ws.cohort_id = m.cohort_id AND ws.active = TRUE AND ws.step_type = 'payout' AND ws.role = 'system' ORDER BY ws.position LIMIT 1) payout_step ON TRUE WHERE s.id = $4 AND s.status = 'awaiting_finance' AND learner.paystack_recipient_code LIKE 'RCP_%' AND $5 LIKE 'sk_test_%' AND $5 NOT LIKE 'sk_live_%' AND NOT EXISTS (SELECT 1 FROM payouts existing WHERE existing.organization_id = s.organization_id AND existing.submission_id = s.id AND existing.status IN ('queued', 'processing', 'paid'))), locked AS (UPDATE submissions s SET status = 'processing', current_step_id = c.payout_step_id, updated_at = CURRENT_TIMESTAMP FROM candidate c WHERE s.id = c.id AND s.organization_id = c.organization_id AND s.status = 'awaiting_finance' RETURNING s.*, c.amount, c.currency), created AS (INSERT INTO payouts (organization_id, submission_id, learner_id, amount, currency, provider, provider_reference, status, approved_at, paid_at, created_at, updated_at) SELECT l.organization_id, l.id, l.learner_id, l.amount, l.currency, 'paystack-test', concat('msr_test_', replace($6, '-', '')), 'processing', CURRENT_TIMESTAMP, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM locked l RETURNING *), audited AS (INSERT INTO audit_events (organization_id, submission_id, actor_id, actor_name, actor_role, event_type, event_key, title, detail, metadata, created_at) SELECT p.organization_id, p.submission_id, ca.id, ca.name, ca.role, e.event_type, concat(e.event_type, ':', p.id), e.title, e.detail, jsonb_build_object('providerReference', p.provider_reference, 'status', p.status), p.created_at FROM created p CROSS JOIN caller ca CROSS JOIN LATERAL (VALUES ('finance_approved', 'Stipend authorized', 'Eligibility, recipient, and budget checks passed.'), ('payout_queued', 'Test payout queued', 'Sub0 queued a Paystack test-mode transfer with retries.')) e(event_type, title, detail) RETURNING id) SELECT p.id, p.submission_id AS \"submissionId\", p.learner_id AS \"learnerId\", learner.name AS \"learnerName\", m.title AS \"milestoneTitle\", p.amount, p.currency, p.provider, p.provider_reference AS \"providerReference\", p.status, p.approved_at::text AS \"approvedAt\", p.paid_at::text AS \"paidAt\" FROM created p JOIN submissions s ON s.id = p.submission_id AND s.organization_id = p.organization_id JOIN milestones m ON m.id = s.milestone_id AND m.organization_id = p.organization_id JOIN users learner ON learner.id = p.learner_id AND learner.organization_id = p.organization_id JOIN (SELECT COUNT(*) AS audit_count FROM audited) audit_guard ON audit_guard.audit_count = 2",
+        "parameters": [
+          "$PROTECTED.id",
+          "$PROTECTED.organizationId",
+          "$PROTECTED.role",
+          "$PAYLOAD.submission_id",
+          "$ENV.PAYSTACK_SECRET_KEY",
+          "$GENERATOR.UUID"
+        ]
+      },
+      "returnables": [
+        "id",
+        "submissionId",
+        "learnerId",
+        "learnerName",
+        "milestoneTitle",
+        "amount",
+        "currency",
+        "provider",
+        "providerReference",
+        "status",
+        "approvedAt",
+        "paidAt"
+      ],
+      "main_returnable": true,
+      "broadcast_websocket_message": {
+        "broadcast_type": "SINGLE",
+        "action": "payout.updated",
+        "broadcast_to": "$PROTECTED.id"
+      }
+    },
+    {
+      "id": 2,
+      "mode": "HTTPREQUEST",
+      "run_in_background": true,
+      "queue": {
+        "delay": 0,
+        "priority": 10
+      },
+      "retries": 3,
+      "depends_on": [
+        {
+          "resource_id": "self",
+          "action_ids": [3],
+          "extract_response_for": [
+            {
+              "extract": "amountKobo",
+              "for": "transfer_amount"
+            },
+            {
+              "extract": "recipientCode",
+              "for": "transfer_recipient"
+            },
+            {
+              "extract": "providerReference",
+              "for": "transfer_reference"
+            },
+            {
+              "extract": "transferReason",
+              "for": "transfer_reason"
+            }
+          ]
+        }
+      ],
+      "http": {
+        "url": "https://api.paystack.co/transfer",
+        "method": "POST",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer $ENV.PAYSTACK_SECRET_KEY"
+        },
+        "request_body": {
+          "source": "balance",
+          "amount": "$PAYLOAD.transfer_amount",
+          "recipient": "$PAYLOAD.transfer_recipient",
+          "reason": "$PAYLOAD.transfer_reason",
+          "reference": "$PAYLOAD.transfer_reference"
+        }
+      }
+    },
+    {
+      "id": 3,
+      "mode": "QUERY",
+      "no_op": true,
+      "sql_query": {
+        "query": "SELECT (p.amount * 100)::bigint AS \"amountKobo\", learner.paystack_recipient_code AS \"recipientCode\", p.provider_reference AS \"providerReference\", concat('MilestoneRail test stipend: ', m.title) AS \"transferReason\" FROM payouts p JOIN submissions s ON s.id = p.submission_id AND s.organization_id = p.organization_id JOIN milestones m ON m.id = s.milestone_id AND m.organization_id = p.organization_id JOIN users learner ON learner.id = p.learner_id AND learner.organization_id = p.organization_id AND learner.active = TRUE JOIN users caller ON caller.id = $1 AND caller.organization_id = $2 AND caller.role = $3 AND caller.role IN ('finance', 'admin') AND caller.active = TRUE JOIN organizations o ON o.id = caller.organization_id AND o.active = TRUE WHERE p.organization_id = caller.organization_id AND p.submission_id = $4 AND p.provider = 'paystack-test' AND p.status = 'processing' AND learner.paystack_recipient_code LIKE 'RCP_%' AND $5 LIKE 'sk_test_%' AND $5 NOT LIKE 'sk_live_%' ORDER BY p.created_at DESC LIMIT 1",
+        "parameters": [
+          "$PROTECTED.id",
+          "$PROTECTED.organizationId",
+          "$PROTECTED.role",
+          "$PAYLOAD.submission_id",
+          "$ENV.PAYSTACK_SECRET_KEY"
+        ]
+      },
+      "returnables": ["amountKobo", "recipientCode", "providerReference", "transferReason"]
+    }
+  ]
+}

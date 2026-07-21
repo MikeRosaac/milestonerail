@@ -1,0 +1,79 @@
+{
+  "id": {
+    "type": "Number",
+    "primary_key": true,
+    "auto_increment": true
+  },
+  "organization_id": {
+    "type": "Number",
+    "foreign_key": {
+      "of": "organizations",
+      "key": "id"
+    },
+    "indexable": true
+  },
+  "milestone_id": {
+    "type": "Number",
+    "foreign_key": {
+      "of": "milestones",
+      "key": "id"
+    },
+    "indexable": true
+  },
+  "learner_id": {
+    "type": "Number",
+    "foreign_key": {
+      "of": "users",
+      "key": "id"
+    },
+    "indexable": true
+  },
+  "evidence_url": {
+    "type": "String",
+    "max_length": 2048,
+    "optional": true
+  },
+  "evidence_storage_key": {
+    "type": "String",
+    "max_length": 2048,
+    "optional": true
+  },
+  "evidence_file_name": {
+    "type": "String",
+    "max_length": 512,
+    "optional": true
+  },
+  "evidence_note": {
+    "type": "String",
+    "max_length": 2000
+  },
+  "status": {
+    "type": "String",
+    "max_length": 32,
+    "indexable": true
+  },
+  "current_step_id": {
+    "type": "Number",
+    "foreign_key": {
+      "of": "workflow_steps",
+      "key": "id"
+    },
+    "indexable": true
+  },
+  "submitted_at": {
+    "type": "DateTime",
+    "optional": true
+  },
+  "reviewer_feedback": {
+    "type": "String",
+    "max_length": 2000,
+    "optional": true
+  },
+  "created_at": {
+    "type": "DateTime"
+  },
+  "updated_at": {
+    "type": "DateTime",
+    "indexable": true
+  }
+}

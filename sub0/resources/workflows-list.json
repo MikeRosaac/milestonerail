@@ -1,0 +1,35 @@
+{
+  "id": "milestonerail-workflows-list-v1",
+  "resource": "workflows/list",
+  "tokenize": {
+    "type": "JWT",
+    "algorithm": "HS256",
+    "encryption_key": "$ENV.JWT_SECRET_KEY"
+  },
+  "protected": {
+    "provide_as": "Authorization",
+    "extract_claims": ["id", "organizationId", "role", "name", "email"]
+  },
+  "actionables": [
+    {
+      "id": 1,
+      "mode": "QUERY",
+      "sql_query": {
+        "query": "SELECT ws.id, ws.cohort_id AS \"cohortId\", ws.label, ws.description, ws.step_type AS type, ws.role, ws.position, ws.sla_hours AS \"slaHours\", ws.active FROM workflow_steps ws JOIN cohorts c ON c.id = ws.cohort_id AND c.organization_id = ws.organization_id JOIN users caller ON caller.id = $1 AND caller.organization_id = $2 AND caller.role = $3 AND caller.role IN ('learner', 'mentor', 'finance', 'admin') AND caller.active = TRUE JOIN organizations o ON o.id = caller.organization_id AND o.active = TRUE WHERE ws.organization_id = caller.organization_id AND c.active = TRUE AND c.id = (SELECT c2.id FROM cohorts c2 WHERE c2.organization_id = caller.organization_id AND c2.active = TRUE ORDER BY c2.start_date DESC, c2.id DESC LIMIT 1) ORDER BY ws.position, ws.id",
+        "parameters": ["$PROTECTED.id", "$PROTECTED.organizationId", "$PROTECTED.role"]
+      },
+      "returnables": [
+        "id",
+        "cohortId",
+        "label",
+        "description",
+        "type",
+        "role",
+        "position",
+        "slaHours",
+        "active"
+      ],
+      "main_returnable": true
+    }
+  ]
+}

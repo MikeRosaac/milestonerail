@@ -1,0 +1,90 @@
+{
+  "id": "milestonerail-workflows-save-v1",
+  "resource": "workflows/save",
+  "tokenize": {
+    "type": "JWT",
+    "algorithm": "HS256",
+    "encryption_key": "$ENV.JWT_SECRET_KEY"
+  },
+  "protected": {
+    "provide_as": "Authorization",
+    "extract_claims": ["id", "organizationId", "role", "name", "email"]
+  },
+  "rate_limit": {
+    "limit": 20,
+    "identifier": "$PROTECTED.id",
+    "expires_after": 60
+  },
+  "actionables": [
+    {
+      "id": 1,
+      "mode": "QUERY",
+      "payload_validation": [
+        {
+          "field": {
+            "steps": {
+              "type": "ARRAY",
+              "fields": {
+                "id": {
+                  "type": "NUMBER"
+                },
+                "cohortId": {
+                  "type": "NUMBER"
+                },
+                "label": {
+                  "type": "STRING",
+                  "min_length": 1,
+                  "max_length": 160
+                },
+                "description": {
+                  "type": "STRING",
+                  "min_length": 1,
+                  "max_length": 2000
+                },
+                "type": {
+                  "type": "STRING",
+                  "min_length": 6,
+                  "max_length": 8
+                },
+                "role": {
+                  "type": "STRING",
+                  "min_length": 5,
+                  "max_length": 7
+                },
+                "position": {
+                  "type": "NUMBER"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "sql_query": {
+        "query": "WITH caller AS (SELECT u.id, u.organization_id FROM users u JOIN organizations o ON o.id = u.organization_id AND o.active = TRUE WHERE u.id = $1 AND u.organization_id = $2 AND u.role = $3 AND u.role = 'admin' AND u.active = TRUE), raw_input AS (SELECT (item->>'id')::bigint AS id, (item->>'cohortId')::bigint AS cohort_id, item->>'label' AS label, item->>'description' AS description, item->>'type' AS step_type, item->>'role' AS role, (item->>'position')::integer AS position, (item->>'slaHours')::integer AS sla_hours, (item->>'active')::boolean AS active FROM jsonb_array_elements($4::jsonb) item), validated AS (SELECT r.*, ca.organization_id FROM raw_input r CROSS JOIN caller ca JOIN cohorts c ON c.id = r.cohort_id AND c.organization_id = ca.organization_id AND c.active = TRUE WHERE r.id > 0 AND r.position > 0 AND r.step_type IN ('evidence', 'approval', 'payout', 'receipt') AND r.role IN ('learner', 'mentor', 'finance', 'admin', 'system') AND length(r.label) BETWEEN 1 AND 160 AND length(r.description) BETWEEN 1 AND 2000 AND (r.sla_hours IS NULL OR r.sla_hours BETWEEN 1 AND 720) AND r.active IS NOT NULL), authorized_input AS (SELECT * FROM validated WHERE (SELECT COUNT(*) FROM raw_input) BETWEEN 1 AND 20 AND (SELECT COUNT(*) FROM validated) = (SELECT COUNT(*) FROM raw_input) AND (SELECT COUNT(DISTINCT id) FROM validated) = (SELECT COUNT(*) FROM validated) AND (SELECT COUNT(DISTINCT (cohort_id, position)) FROM validated) = (SELECT COUNT(*) FROM validated)), deactivated AS (UPDATE workflow_steps ws SET active = FALSE, updated_at = CURRENT_TIMESTAMP WHERE ws.organization_id = (SELECT organization_id FROM caller) AND ws.cohort_id IN (SELECT DISTINCT cohort_id FROM authorized_input) AND ws.id NOT IN (SELECT id FROM authorized_input) RETURNING ws.id), upserted AS (INSERT INTO workflow_steps (id, organization_id, cohort_id, label, description, step_type, role, position, sla_hours, active, created_at, updated_at) SELECT a.id, a.organization_id, a.cohort_id, a.label, a.description, a.step_type, a.role, a.position, a.sla_hours, a.active, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM authorized_input a CROSS JOIN (SELECT COUNT(*) FROM deactivated) deactivation_guard ON CONFLICT (id) DO UPDATE SET label = EXCLUDED.label, description = EXCLUDED.description, step_type = EXCLUDED.step_type, role = EXCLUDED.role, position = EXCLUDED.position, sla_hours = EXCLUDED.sla_hours, active = EXCLUDED.active, updated_at = CURRENT_TIMESTAMP WHERE workflow_steps.organization_id = EXCLUDED.organization_id AND workflow_steps.cohort_id = EXCLUDED.cohort_id RETURNING id, organization_id, cohort_id) SELECT ws.id, ws.cohort_id AS \"cohortId\", ws.label, ws.description, ws.step_type AS type, ws.role, ws.position, ws.sla_hours AS \"slaHours\", ws.active FROM workflow_steps ws WHERE ws.organization_id = (SELECT organization_id FROM caller) AND EXISTS (SELECT 1 FROM upserted u WHERE u.organization_id = ws.organization_id AND u.cohort_id = ws.cohort_id) ORDER BY ws.position, ws.id",
+        "parameters": [
+          "$PROTECTED.id",
+          "$PROTECTED.organizationId",
+          "$PROTECTED.role",
+          "$PAYLOAD.steps"
+        ]
+      },
+      "returnables": [
+        "id",
+        "cohortId",
+        "label",
+        "description",
+        "type",
+        "role",
+        "position",
+        "slaHours",
+        "active"
+      ],
+      "main_returnable": true,
+      "broadcast_websocket_message": {
+        "broadcast_type": "SINGLE",
+        "action": "workflow.updated",
+        "broadcast_to": "$PROTECTED.id"
+      }
+    }
+  ]
+}
